@@ -5,6 +5,13 @@ open System.IO
 
 let rand = Random()
 
+let private b = rand.Next((int)Int16.MaxValue) |> int16
+let private c = rand.Next((int)Int16.MaxValue) |> int16
+let private d = Array.zeroCreate 8
+rand.NextBytes d
+
+let guidFromCounter i = new Guid(i, b, c, d)
+
 let generateAnts bound writer =
     let antsByType =
         seq {0..255}
@@ -36,13 +43,7 @@ let generateAnts bound writer =
     antsByType |> Seq.concat
 
 let generateCells bound writer = 
-    let cells = Array.init bound (fun _ -> Guid.NewGuid())
-    
     writer (fun w ->
-        cells
-        |> Seq.sort
-        |> Seq.iter (fun id -> w id (rand.Next(0, 256) |> byte))
+        seq{0..bound-1}
+        |> Seq.iter (fun i -> w (i |> guidFromCounter) (rand.Next(0, 256) |> byte))
     )
-
-    cells
-

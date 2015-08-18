@@ -3,6 +3,9 @@ open System.IO
 
 open Generators
 
+let linqSort selector (source: System.Collections.Generic.IEnumerable<_>) =
+    System.Linq.Enumerable.OrderBy(source, (fun v -> v |> selector)) 
+
 let generate bound outDir =
     if not(Directory.Exists(outDir)) then invalidArg "outDir" "Directory does not exist"
     printfn "Generating data with upper bound %i to %s" bound outDir
@@ -27,18 +30,18 @@ let generate bound outDir =
         sw.Reset()
 
     st()
+    generateCells bound ("cells" |> generateFileGuidToByte)
+    ts "Cells generated"
+    st()
     let ants = generateAnts bound ("ants" |> generateFileGuidToByte)
     ts "Ants generated"
     st()
-    let cells = generateCells bound ("cells" |> generateFileGuidToByte)
-    ts "Cells generated"
-    st()
     generateFileByLine "antsToCells" (fun w -> 
         ants
-        |> Seq.collect (fun ant -> Seq.init (rand.Next(1, 3)) (fun _ -> (ant, cells.[rand.Next(bound)])))
+        |> Seq.collect (fun ant -> Seq.init (rand.Next(1, 3)) (fun _ -> (ant, rand.Next(bound))))
         |> Seq.take bound
-        |> Seq.sortBy snd
-        |> Seq.iter (fun (ant, cell) -> w (ant.ToString("N"), cell.ToString("N")))
+        |> linqSort snd
+        |> Seq.iter (fun (ant, cellI) -> w (ant.ToString("N"), (cellI |> guidFromCounter).ToString("N")))
     )
     ts "Links generated"
 
