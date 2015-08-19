@@ -55,15 +55,19 @@ namespace AntHeap.Parser
                 // ReSharper disable once LoopCanBePartlyConvertedToQuery
                 foreach (var cell in ReadCells())
                 {
-                    if (linkEnumerator.Current.Item1.CompareTo(cell.Item1) < 0)
+                    var rel = linkEnumerator.Current.Item1.CompareTo(cell.Item1);
+                    if (rel < 0)
                         throw new InvalidOperationException("Moved too far");
 
-                    if (linkEnumerator.Current.Item1.CompareTo(cell.Item1) > 0)
+                    if (rel > 0)
                         continue;
 
+                    var writer = _outputs[cell.Item2].Value;
                     while (linkEnumerator.Current.Item1.Equals(cell.Item1))
                     {
-                        WriteOutput(cell.Item1, cell.Item2, linkEnumerator.Current.Item2);
+                        writer.Write(linkEnumerator.Current.Item2.ToString("N"));
+                        writer.Write('\t');
+                        writer.WriteLine(cell.Item1.ToString("N"));
                         if (!linkEnumerator.MoveNext())
                             return;
                     }
@@ -122,14 +126,6 @@ namespace AntHeap.Parser
                     yield return Tuple.Create(Guid.ParseExact(new string(buffer, 33, 32), "N"), ant);
                 }
             }
-        }
-
-        private void WriteOutput(Guid cell, byte type, Guid ant)
-        {
-            var writer = _outputs[type].Value;
-            writer.Write(ant.ToString("N"));
-            writer.Write('\t');
-            writer.WriteLine(cell.ToString("N"));
         }
     }
 }
