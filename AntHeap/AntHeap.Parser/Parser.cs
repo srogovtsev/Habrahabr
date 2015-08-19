@@ -32,27 +32,7 @@ namespace AntHeap.Parser
             sw.Start();
             try
             {
-                var ants = new HashSet<Guid>(ReadAnts());
-
-                using (var cellsEnumerator = ReadCells().GetEnumerator())
-                {
-                    if (!cellsEnumerator.MoveNext())
-                        throw new InvalidOperationException("Empty cell list");
-
-                    foreach (var cellPop in ReadCellPopulation(ants))
-                    {
-                        while (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) < 0)
-                        {
-                            if (!cellsEnumerator.MoveNext())
-                                throw new InvalidOperationException("Can't find cell");
-                        }
-
-                        if (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) > 0)
-                            throw new InvalidOperationException("Can't find cell");
-
-                        WriteOutput(cellsEnumerator.Current.Item1, cellsEnumerator.Current.Item2, cellPop.Item2);
-                    }
-                }
+                ParseImpl();
             }
             finally
             {
@@ -62,6 +42,33 @@ namespace AntHeap.Parser
             }
             sw.Stop();
             Console.WriteLine("Parsing complete in " + sw.Elapsed.ToString("mm\\:ss\\.fff"));
+        }
+
+        private void ParseImpl()
+        {
+            var ants = new HashSet<Guid>(ReadAnts());
+            using (var linkEnumerator = ReadLinks(ants).GetEnumerator())
+            {
+                if (!linkEnumerator.MoveNext())
+                    return;
+
+                // ReSharper disable once LoopCanBePartlyConvertedToQuery
+                foreach (var cell in ReadCells())
+                {
+                    if (linkEnumerator.Current.Item1.CompareTo(cell.Item1) < 0)
+                        throw new InvalidOperationException("Moved too far");
+
+                    if (linkEnumerator.Current.Item1.CompareTo(cell.Item1) > 0)
+                        continue;
+
+                    while (linkEnumerator.Current.Item1.Equals(cell.Item1))
+                    {
+                        WriteOutput(cell.Item1, cell.Item2, linkEnumerator.Current.Item2);
+                        if (!linkEnumerator.MoveNext())
+                            return;
+                    }
+                }
+            }
         }
 
         private TextReader ReadInput(string file)
@@ -117,36 +124,12 @@ namespace AntHeap.Parser
             }
         }
 
-        // ReSharper disable once SuggestBaseTypeForParameter
-        private IEnumerable<Tuple<Guid, IEnumerable<Guid>>> ReadCellPopulation(HashSet<Guid> ants)
-        {
-            Tuple<Guid, LinkedList<Guid>> current = null;
-            foreach (var link in ReadLinks(ants))
-            {
-                if (current == null)
-                    current = Tuple.Create(link.Item1, new LinkedList<Guid>());
-                if (current.Item1 == link.Item1)
-                    current.Item2.AddLast(link.Item2);
-                else
-                {
-                    yield return Tuple.Create(current.Item1, current.Item2.AsEnumerable());
-                    current = Tuple.Create(link.Item1, new LinkedList<Guid>());
-                    current.Item2.AddLast(link.Item2);
-                }
-            }
-            if (current != null)
-                yield return Tuple.Create(current.Item1, current.Item2.AsEnumerable());
-        }
-
-        private void WriteOutput(Guid cell, byte type, IEnumerable<Guid> ants)
+        private void WriteOutput(Guid cell, byte type, Guid ant)
         {
             var writer = _outputs[type].Value;
-            foreach (var ant in ants)
-            {
-                writer.Write(ant.ToString("N"));
-                writer.Write('\t');
-                writer.WriteLine(cell.ToString("N"));
-            }
+            writer.Write(ant.ToString("N"));
+            writer.Write('\t');
+            writer.WriteLine(cell.ToString("N"));
         }
     }
 }
