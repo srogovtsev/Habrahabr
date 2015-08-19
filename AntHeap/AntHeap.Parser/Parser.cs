@@ -10,46 +10,56 @@ namespace AntHeap.Parser
         private readonly string _in;
         private readonly string _out;
         private readonly byte _type;
-        private readonly Lazy<StreamWriter>[] _outputs;
+        private readonly StreamWriter[] _outputs;
+        const int NTypes=256;
 
         public Parser(string @in, string @out, byte type)
         {
             _in = @in;
             _out = @out;
             _type = type;
-            _outputs = Enumerable
-                .Range(0, 256)
-                .Select(i => Path.Combine(@out, "area-" + i.ToString("D3")))
-                .Select(f => new Lazy<StreamWriter>(() => new StreamWriter(new FileStream(f, FileMode.Create, FileAccess.Write))))
-                .ToArray();
+            _outputs = new StreamWriter[NTypes];
         }
 
+        StreamWriter GetStream(int tp) {
+            if(_outputs[tp]==null) {
+                string fn=Path.Combine(_out,"area-" + tp.ToString("D3"));
+                _outputs[tp]=new StreamWriter(fn);
+            }
+            return _outputs[tp];
+        }
+
+        string m_NextCell,m_NextCellType,m_NextAntCell;
+        Guid m_NextAntGUID;
+        TextReader m_AntsToCellsStream,m_CellsStream;
+        HashSet<Guid> _ants;
         public void Parse()
         {
             Console.WriteLine("Parsing ants of type {0} from {1} to {2}", _type, _in, _out);
             var sw = new System.Diagnostics.Stopwatch();
             sw.Start();
-            var ants = new HashSet<Guid>(ReadAnts());
+            _ants = new HashSet<Guid>(ReadAnts());
+            m_AntsToCellsStream=ReadInput("antsToCells");
+            m_CellsStream=ReadInput("Cells");
 
-            using (var cellsEnumerator = ReadCells().GetEnumerator())
-            {
-                if (!cellsEnumerator.MoveNext())
-                    throw new InvalidOperationException("Empty cell list");
+            ReadAntToCell();
+            ReadCell();
 
-                foreach (var cellPop in ReadCellPopulation(ants))
-                {
-                    while (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) < 0)
-                    {
-                        if (!cellsEnumerator.MoveNext())
-                            throw new InvalidOperationException("Can't find cell");
-                    }
-
-                    if (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) > 0)
+            while(m_NextCell!=null && m_NextAntCell!=null) {
+                int k=m_NextAntCell.CompareTo(m_NextCell);
+                if(k>0)
+                    ReadCell();
+                else {
+                    if(k==0)
+                        SaveAnt();
+                    else
                         throw new InvalidOperationException("Can't find cell");
-
-                    WriteOutput(cellsEnumerator.Current.Item1, cellsEnumerator.Current.Item2, cellPop.Item2);
+                    ReadAntToCell();
                 }
             }
+
+            foreach(var v in _outputs) if(v!=null)
+                    v.Close();
             sw.Stop();
             Console.WriteLine("Parsing complete in " + sw.Elapsed.ToString("mm\\:ss\\.fff"));
         }
@@ -75,69 +85,45 @@ namespace AntHeap.Parser
             }
         }
 
-        private IEnumerable<Tuple<Guid, byte>> ReadCells()
-        {
-            using (var r = ReadInput("cells"))
-            {
-                var buffer = new char[38];
-                while (r.Read(buffer, 0, 38) == 38)
-                {
-                    if (buffer[32] != '\t' || buffer[36] != '\r' || buffer[37] != '\n')
+
+        const int LCellRecord=38;
+        char[] m_cellBuffer=new char[LCellRecord];
+        void ReadCell() {
+            if(m_CellsStream.Read(m_cellBuffer,0,LCellRecord)<LCellRecord) {
+                m_NextCell=m_NextCellType=null;
+            } else {
+                if(m_cellBuffer[32] != '\t' || m_cellBuffer[36] != '\r' || m_cellBuffer[37] != '\n')
+                    throw new InvalidOperationException("Wrong file format");
+                m_NextCell=new string(m_cellBuffer,0,32);
+                m_NextCellType=new string(m_cellBuffer,33,3);
+            }
+        }
+
+        const int LAntToCellRecord=67;
+        char[] m_antBuffer=new char[LAntToCellRecord];
+        void ReadAntToCell() {
+            for(;;) {
+                if(m_AntsToCellsStream.Read(m_antBuffer,0,LAntToCellRecord)<LAntToCellRecord) {
+                    m_NextAntCell=null;
+                    return;
+                } else {
+                    if(m_antBuffer[32] != '\t' || m_antBuffer[65] != '\r' || m_antBuffer[66] != '\n')
                         throw new InvalidOperationException("Wrong file format");
-                    yield return Tuple.Create(Guid.ParseExact(new string(buffer, 0, 32), "N"), byte.Parse(new string(buffer, 33, 3)));
+                    m_NextAntGUID=Guid.ParseExact(new string(m_antBuffer,0,32),"N");
+                    if(_ants.Contains(m_NextAntGUID)) {
+                        m_NextAntCell=new string(m_antBuffer,33,32);
+                        return;
+                    }
                 }
             }
         }
 
-        // ReSharper disable once SuggestBaseTypeForParameter
-        private IEnumerable<Tuple<Guid, Guid>> ReadLinks(HashSet<Guid> ants)
-        {
-            using (var r = ReadInput("antsToCells"))
-            {
-                var buffer = new char[67];
-                while (r.Read(buffer, 0, 67) == 67)
-                {
-                    if (buffer[32] != '\t' || buffer[65] != '\r' || buffer[66] != '\n')
-                        throw new InvalidOperationException("Wrong file format");
-                    var ant = Guid.ParseExact(new string(buffer, 0, 32), "N");
-                    if (!ants.Contains(ant))
-                        continue;
-                    yield return Tuple.Create(Guid.ParseExact(new string(buffer, 33, 32), "N"), ant);
-                }
-            }
-        }
-
-        // ReSharper disable once SuggestBaseTypeForParameter
-        private IEnumerable<Tuple<Guid, IEnumerable<Guid>>> ReadCellPopulation(HashSet<Guid> ants)
-        {
-            Tuple<Guid, LinkedList<Guid>> current = null;
-            foreach (var link in ReadLinks(ants))
-            {
-                if (current == null)
-                    current = Tuple.Create(link.Item1, new LinkedList<Guid>());
-                if (current.Item1 == link.Item1)
-                    current.Item2.AddLast(link.Item2);
-                else
-                {
-                    yield return Tuple.Create(current.Item1, current.Item2.AsEnumerable());
-                    current = Tuple.Create(link.Item1, new LinkedList<Guid>());
-                    current.Item2.AddLast(link.Item2);
-                }
-            }
-            if (current != null)
-                yield return Tuple.Create(current.Item1, current.Item2.AsEnumerable());
-        }
-
-        private void WriteOutput(Guid cell, byte type, IEnumerable<Guid> ants)
-        {
-            var writer = _outputs[type].Value;
-            foreach (var ant in ants)
-            {
-                writer.Write(ant.ToString("N"));
-                writer.Write('\t');
-                writer.WriteLine(cell.ToString("N"));
-            }
-            writer.Flush();
+        private void SaveAnt() {
+            int type=int.Parse(m_NextCellType);
+            var writer =GetStream(type);
+            writer.Write(m_NextAntGUID.ToString("N"));
+            writer.Write('\t');
+            writer.WriteLine(m_NextCell);
         }
     }
 }
