@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Monads;
 
 namespace AntHeap.Parser
 {
@@ -29,26 +30,35 @@ namespace AntHeap.Parser
             Console.WriteLine("Parsing ants of type {0} from {1} to {2}", _type, _in, _out);
             var sw = new System.Diagnostics.Stopwatch();
             sw.Start();
-            var ants = new HashSet<Guid>(ReadAnts());
-
-            using (var cellsEnumerator = ReadCells().GetEnumerator())
+            try
             {
-                if (!cellsEnumerator.MoveNext())
-                    throw new InvalidOperationException("Empty cell list");
+                var ants = new HashSet<Guid>(ReadAnts());
 
-                foreach (var cellPop in ReadCellPopulation(ants))
+                using (var cellsEnumerator = ReadCells().GetEnumerator())
                 {
-                    while (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) < 0)
+                    if (!cellsEnumerator.MoveNext())
+                        throw new InvalidOperationException("Empty cell list");
+
+                    foreach (var cellPop in ReadCellPopulation(ants))
                     {
-                        if (!cellsEnumerator.MoveNext())
+                        while (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) < 0)
+                        {
+                            if (!cellsEnumerator.MoveNext())
+                                throw new InvalidOperationException("Can't find cell");
+                        }
+
+                        if (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) > 0)
                             throw new InvalidOperationException("Can't find cell");
+
+                        WriteOutput(cellsEnumerator.Current.Item1, cellsEnumerator.Current.Item2, cellPop.Item2);
                     }
-
-                    if (cellsEnumerator.Current.Item1.CompareTo(cellPop.Item1) > 0)
-                        throw new InvalidOperationException("Can't find cell");
-
-                    WriteOutput(cellsEnumerator.Current.Item1, cellsEnumerator.Current.Item2, cellPop.Item2);
                 }
+            }
+            finally
+            {
+                _outputs
+                    .Where(o => o.IsValueCreated)
+                    .Do(o => o.Value.Close());
             }
             sw.Stop();
             Console.WriteLine("Parsing complete in " + sw.Elapsed.ToString("mm\\:ss\\.fff"));
@@ -137,7 +147,6 @@ namespace AntHeap.Parser
                 writer.Write('\t');
                 writer.WriteLine(cell.ToString("N"));
             }
-            writer.Flush();
         }
     }
 }
