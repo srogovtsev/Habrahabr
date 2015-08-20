@@ -50,7 +50,7 @@ namespace AntHeap.Parser
                 // ReSharper disable once LoopCanBePartlyConvertedToQuery
                 foreach (var cell in ReadCells())
                 {
-                    var rel = linkEnumerator.Current.Item1.CompareTo(cell.Item1);
+                    var rel = string.Compare(linkEnumerator.Current.Item1, cell.Item1, StringComparison.Ordinal);
                     if (rel < 0)
                         throw new InvalidOperationException("Moved too far");
 
@@ -58,11 +58,11 @@ namespace AntHeap.Parser
                         continue;
 
                     var writer = GetWriter(cell.Item2);
-                    while (linkEnumerator.Current.Item1.Equals(cell.Item1))
+                    while (string.Equals(linkEnumerator.Current.Item1, cell.Item1, StringComparison.Ordinal))
                     {
                         writer.Write(linkEnumerator.Current.Item2.ToString("N"));
                         writer.Write('\t');
-                        writer.WriteLine(cell.Item1.ToString("N"));
+                        writer.WriteLine(cell.Item1);
                         if (!linkEnumerator.MoveNext())
                             return;
                     }
@@ -70,16 +70,15 @@ namespace AntHeap.Parser
             }
         }
 
-        private TextWriter GetWriter(byte cellType)
+        private TextWriter GetWriter(string cellType)
         {
+            var b = byte.Parse(cellType);
             // ReSharper disable once ConvertIfStatementToNullCoalescingExpression
-            if (_outputs[cellType] == null)
+            if (_outputs[b] == null)
             {
-                _outputs[cellType] =
-                    new StreamWriter(new FileStream(Path.Combine(_out, "area-" + cellType.ToString("D3")),
-                        FileMode.Create, FileAccess.Write));
+                _outputs[b] = new StreamWriter(new FileStream(Path.Combine(_out, "area-" + cellType), FileMode.Create, FileAccess.Write));
             }
-            return _outputs[cellType];
+            return _outputs[b];
         }
 
         private TextReader ReadInput(string file)
@@ -103,7 +102,7 @@ namespace AntHeap.Parser
             }
         }
 
-        private IEnumerable<Tuple<Guid, byte>> ReadCells()
+        private IEnumerable<Tuple<string, string>> ReadCells()
         {
             using (var r = ReadInput("cells"))
             {
@@ -112,13 +111,13 @@ namespace AntHeap.Parser
                 {
                     if (buffer[32] != '\t' || buffer[36] != '\r' || buffer[37] != '\n')
                         throw new InvalidOperationException("Wrong file format");
-                    yield return Tuple.Create(Guid.ParseExact(new string(buffer, 0, 32), "N"), byte.Parse(new string(buffer, 33, 3)));
+                    yield return Tuple.Create(new string(buffer, 0, 32), new string(buffer, 33, 3));
                 }
             }
         }
 
         // ReSharper disable once SuggestBaseTypeForParameter
-        private IEnumerable<Tuple<Guid, Guid>> ReadLinks(HashSet<Guid> ants)
+        private IEnumerable<Tuple<string, Guid>> ReadLinks(HashSet<Guid> ants)
         {
             using (var r = ReadInput("antsToCells"))
             {
@@ -130,7 +129,7 @@ namespace AntHeap.Parser
                     var ant = Guid.ParseExact(new string(buffer, 0, 32), "N");
                     if (!ants.Contains(ant))
                         continue;
-                    yield return Tuple.Create(Guid.ParseExact(new string(buffer, 33, 32), "N"), ant);
+                    yield return Tuple.Create(new string(buffer, 33, 32), ant);
                 }
             }
         }
