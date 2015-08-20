@@ -11,18 +11,13 @@ namespace AntHeap.Parser
         private readonly string _in;
         private readonly string _out;
         private readonly byte _type;
-        private readonly Lazy<StreamWriter>[] _outputs;
+        private readonly TextWriter[] _outputs = new TextWriter[256];
 
         public Parser(string @in, string @out, byte type)
         {
             _in = @in;
             _out = @out;
             _type = type;
-            _outputs = Enumerable
-                .Range(0, 256)
-                .Select(i => Path.Combine(@out, "area-" + i.ToString("D3")))
-                .Select(f => new Lazy<StreamWriter>(() => new StreamWriter(new FileStream(f, FileMode.Create, FileAccess.Write))))
-                .ToArray();
         }
 
         public void Parse()
@@ -37,8 +32,8 @@ namespace AntHeap.Parser
             finally
             {
                 _outputs
-                    .Where(o => o.IsValueCreated)
-                    .Do(o => o.Value.Close());
+                    .Where(o => o != null)
+                    .Do(o => o.Close());
             }
             sw.Stop();
             Console.WriteLine("Parsing complete in " + sw.Elapsed.ToString("mm\\:ss\\.fff"));
@@ -62,7 +57,7 @@ namespace AntHeap.Parser
                     if (rel > 0)
                         continue;
 
-                    var writer = _outputs[cell.Item2].Value;
+                    var writer = GetWriter(cell.Item2);
                     while (linkEnumerator.Current.Item1.Equals(cell.Item1))
                     {
                         writer.Write(linkEnumerator.Current.Item2.ToString("N"));
@@ -73,6 +68,18 @@ namespace AntHeap.Parser
                     }
                 }
             }
+        }
+
+        private TextWriter GetWriter(byte cellType)
+        {
+            // ReSharper disable once ConvertIfStatementToNullCoalescingExpression
+            if (_outputs[cellType] == null)
+            {
+                _outputs[cellType] =
+                    new StreamWriter(new FileStream(Path.Combine(_out, "area-" + cellType.ToString("D3")),
+                        FileMode.Create, FileAccess.Write));
+            }
+            return _outputs[cellType];
         }
 
         private TextReader ReadInput(string file)
