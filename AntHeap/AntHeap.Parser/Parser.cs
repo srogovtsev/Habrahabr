@@ -27,7 +27,8 @@ namespace AntHeap.Parser
             sw.Start();
             try
             {
-                ParseImpl();
+                var records = ParseImpl();
+                Console.WriteLine("Processed {0} records", records);
             }
             finally
             {
@@ -39,13 +40,14 @@ namespace AntHeap.Parser
             Console.WriteLine("Parsing complete in " + sw.Elapsed.ToString("mm\\:ss\\.fff"));
         }
 
-        private void ParseImpl()
+        private int ParseImpl()
         {
             var ants = new HashSet<Guid>(ReadAnts());
+            var records = 0;
             using (var linkEnumerator = ReadLinks(ants).GetEnumerator())
             {
                 if (!linkEnumerator.MoveNext())
-                    return;
+                    return records;
 
                 // ReSharper disable once LoopCanBePartlyConvertedToQuery
                 foreach (var cell in ReadCells())
@@ -60,14 +62,16 @@ namespace AntHeap.Parser
                     var writer = GetWriter(cell.Item2);
                     while (string.Equals(linkEnumerator.Current.Item1, cell.Item1, StringComparison.Ordinal))
                     {
+                        records++;
                         writer.Write(linkEnumerator.Current.Item2.ToString("N"));
                         writer.Write('\t');
                         writer.WriteLine(cell.Item1);
                         if (!linkEnumerator.MoveNext())
-                            return;
+                            return records;
                     }
                 }
             }
+            return records;
         }
 
         private TextWriter GetWriter(string cellType)
