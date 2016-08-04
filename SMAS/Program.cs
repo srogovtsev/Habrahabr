@@ -8,31 +8,27 @@ namespace SMAS
     {
         static void Main(string[] args)
         {
-            var test = new ARRAY();
+            var test = new ARRAY(1);
             var reference = new HashSet<int>();
             var rnd = new Random();
 
             reference.Add(1);
-            
-            var ops = test.set(1);
-            ops += test.set(1);
-            for (var i = 0; i <= 100000; i++)
-            {
-                var x = rnd.Next();
-                ops += test.set(x);
-                if (i % 10000 == 0)
-                    Console.WriteLine($"For {test.SetCount} sets {ops} operations performed");
 
-                reference.Add(x);
-                Debug.Assert(test.get(x));
+            var ops = 0;
+            foreach (var o in Sets(rnd, test))
+            {
+                ops += o;
+                Console.WriteLine($"{test.SetCount}: {o}, total {ops}");
             }
+        }
 
-            for (var i = 0; i <= 1000000; i++)
+        private static IEnumerable<int> Sets(Random rnd, ARRAY test)
+        {
+            for (var i = 0; i <= 32; i++)
             {
                 var x = rnd.Next();
-                var actual = test.get(x);
-                var expected = reference.Contains(x);
-                Debug.Assert(actual == expected, $"Expected {expected}, got {actual}");
+                yield return test.set(x);
+                Debug.Assert(test.get(x));
             }
         }
     }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace SMAS
 {
@@ -12,7 +13,12 @@ namespace SMAS
         int countResult = 0;
         int countLeft = 0;
         int countRight = 0;
-        int len = 0;
+        int len;
+
+        public ARRAY(int len)
+        {
+            this.len = len;
+        }
 
         int upd() //пошаговое отложенное слияние двух массивов в один
         {
@@ -60,7 +66,10 @@ namespace SMAS
 
                 if (countResult == len * 2)   //Если после очередного шага слияние завершилось
                 {
-                    if (nextLevel == null) nextLevel = new ARRAY();  //Создаём сл. уровень, если он ещё не существует
+                    if (nextLevel == null) {
+                        //Console.WriteLine("Allocating level...");
+                        nextLevel = new ARRAY(len * 2);  //Создаём сл. уровень, если он ещё не существует
+                    }
                     ops += nextLevel.set(keyResult, len * 2);
                     keyResult = null;
                     keyLeft = null;
@@ -76,8 +85,8 @@ namespace SMAS
 
         int set(int[] Key, int Len)
         {
+            Debug.Assert(len == Len);
             var ops = upd();
-            len = Len;
             if (keyTemp == null)
             {
                 keyTemp = Key;
