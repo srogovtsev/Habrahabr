@@ -18,7 +18,7 @@ namespace SMAS
             foreach (var o in Sets(rnd, test))
             {
                 ops += o;
-                Console.WriteLine($"{test.SetCount}: {o}, total {ops}");
+                Console.WriteLine($"{test.SetCount}: {o}, total {ops}, merges so far {ARRAY.MergeCount}");
             }
         }
 

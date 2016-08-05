@@ -35,6 +35,7 @@ namespace SMAS
                             countResult++;
                             countLeft++;
                             ops++;
+                            MergeCount++;
                         }
                         else //если текущий элемент 2-го подмассива меньше 1-го - вносим его в массив слияния
                         {
@@ -42,6 +43,7 @@ namespace SMAS
                             countResult++;
                             countRight++;
                             ops++;
+                            MergeCount++;
                         }
                     }
                     else  //значит 2-й массив уже весь перемещён и необходимо добавить сл. элемент из первого подмассива
@@ -50,6 +52,7 @@ namespace SMAS
                         countResult++;
                         countLeft++;
                         ops++;
+                        MergeCount++;
                     }
                 }
                 else
@@ -60,6 +63,7 @@ namespace SMAS
                         countResult++;
                         countRight++;
                         ops++;
+                        MergeCount++;
                     }
                     //в противном случае все элементы обоих массивов уже присутствуют в результирующем - ничего не делаем
                 }
@@ -115,6 +119,7 @@ namespace SMAS
         }
 
         public int SetCount { get; private set; } = 0;
+        public static int MergeCount { get; private set; } = 0;
 
         public bool get(int Key)
         {
